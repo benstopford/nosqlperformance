@@ -1,5 +1,7 @@
-package com.benstopford.cassandra;
+package com.benstopford.nosql.coherence;
 
+import com.benstopford.nosql.RunResult;
+import com.benstopford.nosql.Runner;
 import com.tangosol.net.CacheFactory;
 import com.tangosol.net.NamedCache;
 

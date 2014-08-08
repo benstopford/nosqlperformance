@@ -1,5 +1,7 @@
-package com.benstopford.cassandra;
+package com.benstopford.nosql.cassandra;
 
+import com.benstopford.nosql.RunResult;
+import com.benstopford.nosql.Runner;
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AlreadyExistsException;
 

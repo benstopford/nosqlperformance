@@ -1,4 +1,4 @@
-package com.benstopford.cassandra;
+package com.benstopford.nosql;
 
 public interface Runner {
     void initialise() throws Exception;

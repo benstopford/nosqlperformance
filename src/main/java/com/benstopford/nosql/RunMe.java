@@ -1,14 +1,14 @@
-package com.benstopford.cassandra;
+package com.benstopford.nosql;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class PerformanceTest {
+public class RunMe {
     public static void main(String[] args) throws Exception {
-        new PerformanceTest();
+        new RunMe();
     }
 
-    public PerformanceTest() throws Exception {
+    public RunMe() throws Exception {
 
         List<RunResult> results = new ArrayList<RunResult>();
 
