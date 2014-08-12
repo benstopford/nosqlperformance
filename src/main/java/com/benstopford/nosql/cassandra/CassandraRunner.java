@@ -6,12 +6,15 @@ import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AlreadyExistsException;
 
 import java.nio.ByteBuffer;
+import java.util.Collection;
 
 /**
  * Hello world!
  */
 public class CassandraRunner implements Runner {
 
+    //Config
+    public static final String ADDRESS = "10.155.162.45";
 
     private Cluster cluster;
     private Session session;
@@ -19,9 +22,13 @@ public class CassandraRunner implements Runner {
     @Override
     public void initialise() {
 
-        cluster = Cluster.builder().addContactPoint("127.0.0.1").build();
+        cluster = Cluster.builder().addContactPoint(ADDRESS).build();
         session = cluster.connect();
         printConectedHosts(cluster.getMetadata());
+    }
+
+    @Override
+    public void clearDown() throws Exception {
         setupAfresh(session);
     }
 
@@ -45,19 +52,19 @@ public class CassandraRunner implements Runner {
                     "VALUES (" + i + ",'some other index'," +
                     blob +
                     ");";
-            statement.append(string+"\n");
+            statement.append(string + "\n");
 
-            if(i% 1000 ==0){
+            if (i % 1000 == 0) {
                 statement = applyBatch(session, statement);
             }
 
-            totalBytesWritten+= blob.length();
+            totalBytesWritten += blob.length();
             if (i % 100000 == 0) {
                 long throughputToDate = totalBytesWritten * 1000 / (System.currentTimeMillis() - start);
-                long througputInc = (totalBytesWritten-lastTotalBytes) * 1000 / (System.currentTimeMillis() - incrementalTime);
+                long througputInc = (totalBytesWritten - lastTotalBytes) * 1000 / (System.currentTimeMillis() - incrementalTime);
                 lastTotalBytes = totalBytesWritten;
                 incrementalTime = System.currentTimeMillis();
-                System.out.printf("Written %,dB [%,d(hex)B/s][%,d(hex)B/s] %s\n", totalBytesWritten, throughputToDate, througputInc,i);
+                System.out.printf("Written %,dB [%,d(hex)B/s][%,d(hex)B/s] %s\n", totalBytesWritten, throughputToDate, througputInc, i);
             }
         }
         applyBatch(session, statement);
@@ -71,12 +78,12 @@ public class CassandraRunner implements Runner {
         System.out.println();
 
         RunResult runResult = new RunResult("Load Cassandra");
-        runResult.populate(numberOfEntries*entrySizeBytes, took, entrySizeBytes, numberOfEntries, entriesPerBatch);
+        runResult.populate(numberOfEntries * entrySizeBytes, took, entrySizeBytes, numberOfEntries, entriesPerBatch);
         return runResult;
     }
 
     @Override
-    public RunResult readKeyValuePairs(long numberOfEntries,int entriesPerBatch) {
+    public RunResult readKeyValuePairs(long numberOfEntries, int entriesPerBatch) {
 
         System.out.println("Starting read...");
         long start = System.currentTimeMillis();
@@ -84,7 +91,7 @@ public class CassandraRunner implements Runner {
         long totalCount = 0;
         for (int i = 0; i < numberOfEntries; ) {
             StringBuffer s = new StringBuffer();
-                   s.append( "SELECT id, data FROM test.data " +
+            s.append("SELECT id, data FROM test.data " +
                     "WHERE id in (");
 
             //add 100 ids to the where clause
@@ -94,8 +101,8 @@ public class CassandraRunner implements Runner {
                 s.append(i++);
                 s.append(", ");
             }
-            s.append( " ");
-            s.append(i++) ;
+            s.append(" ");
+            s.append(i++);
             s.append(");");
 
             ResultSet results = session.execute(s.toString());
@@ -106,7 +113,7 @@ public class CassandraRunner implements Runner {
             }
 
             if (i % 10000 == 0) {
-                System.out.println("Retrieved " + i + " ("+(totalRead *1000/(System.currentTimeMillis() - start)+"B/s)"));
+                System.out.println("Retrieved " + i + " (" + (totalRead * 1000 / (System.currentTimeMillis() - start) + "B/s)"));
             }
 
         }
@@ -117,6 +124,36 @@ public class CassandraRunner implements Runner {
 
         RunResult runResult = new RunResult("Read Cassandra");
         runResult.populate(totalRead, took, -1, numberOfEntries, entriesPerBatch);
+        return runResult;
+    }
+
+    @Override
+    public RunResult readKeyValuePair(Collection<Integer> keys) throws Exception {
+        long start = System.currentTimeMillis();
+
+        long valueSize = 0;
+        for (Integer key : keys) {
+
+            StringBuffer s = new StringBuffer();
+            s.append("SELECT id, data FROM test.data " +
+                    "WHERE id in (");
+            s.append(key);
+            s.append(");");
+            ResultSet results = session.execute(s.toString());
+            for (Row row : results) {
+                byte[] entry = getData(row);
+                if (entry.length == 0) {
+                    throw new RuntimeException("oops");
+                }
+                valueSize = entry.length;
+            }
+        }
+
+        long took = System.currentTimeMillis() - start;
+        System.out.println("Read All took " + took + "ms");
+
+        RunResult runResult = new RunResult("Read Cassandra");
+        runResult.populate(valueSize, took, -1, 1, 1);
         return runResult;
     }
 

@@ -16,7 +16,7 @@
                 <tcp-initiator>
                     <remote-addresses>
                         <socket-address>
-                            <address>localhost</address>
+                            <address system-property="client.extend.address">localhost</address>
                             <port system-property="client.extend.port">-1</port>
                         </socket-address>
                     </remote-addresses>

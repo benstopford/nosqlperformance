@@ -38,4 +38,6 @@ public class RunResult {
                 ", batch=" + batch +
                 '}';
     }
+
+
 }

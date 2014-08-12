@@ -5,22 +5,28 @@ import com.benstopford.nosql.Runner;
 import com.tangosol.net.CacheFactory;
 import com.tangosol.net.NamedCache;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class CoherenceRunner implements Runner {
-    public static final Integer PORT = 34189;
+
+    //Config
+    public static final Integer PORT = 34323;
+    public static final String ADDRESS = "localhost";
+
     private NamedCache cache;
 
     public void initialise() throws Exception {
         System.setProperty("client.extend.port", PORT.toString());
+        System.setProperty("client.extend.address", ADDRESS.toString());
         cache = CacheFactory.getCacheFactoryBuilder()
                 .getConfigurableCacheFactory("config/client.xml", ClassLoader.getSystemClassLoader())
                 .ensureCache("test", ClassLoader.getSystemClassLoader());
-        cache.clear();
         System.out.println("Connected...");
+    }
+
+    @Override
+    public void clearDown() throws Exception {
+        cache.clear();
     }
 
     public RunResult loadKeyValuePairs(long numberOfEntries, int entrySizeBytes, int entriesPerBatch) {
@@ -31,7 +37,7 @@ public class CoherenceRunner implements Runner {
         long start = System.currentTimeMillis();
         for (int i = 0; i < numberOfEntries; i++) {
             batch.put(i, value);
-            if (i % entriesPerBatch == 0 || i==numberOfEntries-1) {
+            if (i % entriesPerBatch == 0 || i == numberOfEntries - 1) {
                 totalBytesWritten = writeBatch(value, batch, totalBytesWritten);
             }
         }
@@ -59,7 +65,7 @@ public class CoherenceRunner implements Runner {
         long start = System.currentTimeMillis();
         for (int i = 0; i < numberOfEntries; i++) {
             batch.add(i);
-            if (i % entriesPerBatch == 0 || i==numberOfEntries-1) {
+            if (i % entriesPerBatch == 0 || i == numberOfEntries - 1) {
                 totalBytesRead = readBatch(totalBytesRead, batch);
             }
         }
@@ -67,6 +73,23 @@ public class CoherenceRunner implements Runner {
         long took = System.currentTimeMillis() - start;
         RunResult runResult = new RunResult("Read Coherence");
         runResult.populate(totalBytesRead, took, -1, numberOfEntries, entriesPerBatch);
+        return runResult;
+    }
+
+    @Override
+    public RunResult readKeyValuePair(Collection<Integer> keys) throws Exception {
+        long start = System.currentTimeMillis();
+
+        for (Integer key : keys) {
+            Object value = cache.get(key);
+            if (value == null) {
+                throw new RuntimeException("oops");
+            }
+        }
+
+        long took = System.currentTimeMillis() - start;
+        RunResult runResult = new RunResult("Read Coherence");
+        runResult.populate(-1, took, -1, 1, 1);
         return runResult;
     }
 
