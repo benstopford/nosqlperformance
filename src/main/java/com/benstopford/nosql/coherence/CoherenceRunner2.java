@@ -1,16 +1,16 @@
 package com.benstopford.nosql.coherence;
 
-import com.benstopford.nosql.RunResult;
-import com.benstopford.nosql.Runner;
+import com.benstopford.nosql.DB;
+import com.benstopford.nosql.old.RunResult;
 import com.tangosol.net.CacheFactory;
 import com.tangosol.net.NamedCache;
 
 import java.util.*;
 
-public class CoherenceRunner implements Runner {
+public class CoherenceRunner2 implements DB {
 
     //Config
-    public static final Integer PORT = 34323;
+    public static final Integer PORT = 34344;
     public static final String ADDRESS = "localhost";
 
     private NamedCache cache;
@@ -54,6 +54,7 @@ public class CoherenceRunner implements Runner {
     private long writeBatch(byte[] value, Map batch, long totalBytesWritten) {
         cache.putAll(batch);
         totalBytesWritten = totalBytesWritten + (batch.size() * value.length);
+        System.out.println(totalBytesWritten);
         batch.clear();
         return totalBytesWritten;
     }
@@ -76,21 +77,32 @@ public class CoherenceRunner implements Runner {
         return runResult;
     }
 
+//    @Override
+//    public RunResult readKeyValuePair(Collection<Integer> keys) throws Exception {
+//        long start = System.currentTimeMillis();
+//
+//        for (Integer key : keys) {
+//            Object value = cache.get(key);
+//            if (value == null) {
+//                throw new RuntimeException("oops");
+//            }
+//        }
+//
+//        long took = System.currentTimeMillis() - start;
+//        RunResult runResult = new RunResult("Read Coherence");
+//        runResult.populate(-1, took, -1, 1, 1);
+//        return runResult;
+//    }
+
     @Override
-    public RunResult readKeyValuePair(Collection<Integer> keys) throws Exception {
-        long start = System.currentTimeMillis();
+    public void load(Map<String, String> batch) {
 
-        for (Integer key : keys) {
-            Object value = cache.get(key);
-            if (value == null) {
-                throw new RuntimeException("oops");
-            }
-        }
+    }
 
-        long took = System.currentTimeMillis() - start;
-        RunResult runResult = new RunResult("Read Coherence");
-        runResult.populate(-1, took, -1, 1, 1);
-        return runResult;
+
+    @Override
+    public void read(Collection keys, RowValidator rowValidator) {
+
     }
 
     private long readBatch(long totalBytesRead, List batch) {
