@@ -1,4 +1,4 @@
-package com.benstopford.nosql;
+package old;
 
 public class RunResult {
     private long totalBytes;
@@ -38,6 +38,4 @@ public class RunResult {
                 ", batch=" + batch +
                 '}';
     }
-
-
 }

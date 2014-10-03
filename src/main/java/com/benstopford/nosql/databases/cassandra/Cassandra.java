@@ -1,14 +1,23 @@
-package com.benstopford.nosql.cassandra;
+package com.benstopford.nosql.databases.cassandra;
 
 import com.benstopford.nosql.DB;
+import com.benstopford.nosql.util.validators.RowValidator;
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AlreadyExistsException;
 
-import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Map;
 
+/**
+ Cassandra:
+ Timeouts forced me to change in cassandra.yaml:
+ read_request_timeout_in_ms: 30000
+ range_request_timeout_in_ms: 50000
+
+ /Users/benji/BensWorld/Dev/product-explorations/dsc-cassandra-2.0.6/bin
+
+ */
 public class Cassandra implements DB {
     public static final String ADDRESS = "127.0.0.1";
 
@@ -94,6 +103,7 @@ public class Cassandra implements DB {
     }
 
     private void setupAfresh(Session session) {
+        assert (session!=null);
         createKeyspace(session);
         dropExisting(session);
         session.execute(
@@ -106,23 +116,6 @@ public class Cassandra implements DB {
         session.execute("truncate test.data;");
         ResultSet execute = session.execute("select count(*) from test.data");
         System.out.println("Truncated table. Rowcount now: " + execute.iterator().next().getLong("count"));
-    }
-
-
-    private byte[] getData(Row row) {
-        ByteBuffer data = row.getBytes("data");
-        byte[] entry = new byte[data.remaining()];
-        data.get(entry);
-        return entry;
-    }
-
-
-    public static String byteArrayToHex(byte[] a) {
-        StringBuilder sb = new StringBuilder(a.length * 2 + 2);
-        sb.append("0x");
-        for (byte b : a)
-            sb.append(String.format("%02x", b & 0xff));
-        return sb.toString();
     }
 
     private void dropExisting(Session session) {

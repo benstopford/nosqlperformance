@@ -1,13 +1,12 @@
-package com.benstopford.nosql.coherence;
+package old;
 
-import com.benstopford.nosql.DB;
-import com.benstopford.nosql.old.RunResult;
+import com.benstopford.nosql.util.validators.RowValidator;
 import com.tangosol.net.CacheFactory;
 import com.tangosol.net.NamedCache;
 
 import java.util.*;
 
-public class CoherenceRunner2 implements DB {
+public class CoherenceRunner implements DBOld {
 
     //Config
     public static final Integer PORT = 34344;
@@ -77,22 +76,22 @@ public class CoherenceRunner2 implements DB {
         return runResult;
     }
 
-//    @Override
-//    public RunResult readKeyValuePair(Collection<Integer> keys) throws Exception {
-//        long start = System.currentTimeMillis();
-//
-//        for (Integer key : keys) {
-//            Object value = cache.get(key);
-//            if (value == null) {
-//                throw new RuntimeException("oops");
-//            }
-//        }
-//
-//        long took = System.currentTimeMillis() - start;
-//        RunResult runResult = new RunResult("Read Coherence");
-//        runResult.populate(-1, took, -1, 1, 1);
-//        return runResult;
-//    }
+    @Override
+    public RunResult readKeyValuePair(Collection<Integer> keys) throws Exception {
+        long start = System.currentTimeMillis();
+
+        for (Integer key : keys) {
+            Object value = cache.get(key);
+            if (value == null) {
+                throw new RuntimeException("oops");
+            }
+        }
+
+        long took = System.currentTimeMillis() - start;
+        RunResult runResult = new RunResult("Read Coherence");
+        runResult.populate(-1, took, -1, 1, 1);
+        return runResult;
+    }
 
     @Override
     public void load(Map<String, String> batch) {

@@ -1,20 +1,21 @@
-package com.benstopford.nosql.cassandra;
+package old;
 
-import com.benstopford.nosql.RunResult;
-import com.benstopford.nosql.Runner;
+import com.benstopford.nosql.util.validators.RowValidator;
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AlreadyExistsException;
 
 import java.nio.ByteBuffer;
+import java.util.AbstractMap;
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * Hello world!
  */
-public class CassandraRunner implements Runner {
+public class CassandraRunner implements DBOld {
 
     //Config
-    public static final String ADDRESS = "10.155.162.45";
+    public static final String ADDRESS = "127.0.0.1";
 
     private Cluster cluster;
     private Session session;
@@ -30,6 +31,7 @@ public class CassandraRunner implements Runner {
     @Override
     public void clearDown() throws Exception {
         setupAfresh(session);
+//        session.close();
     }
 
     @Override
@@ -56,6 +58,7 @@ public class CassandraRunner implements Runner {
 
             if (i % 1000 == 0) {
                 statement = applyBatch(session, statement);
+
             }
 
             totalBytesWritten += blob.length();
@@ -64,7 +67,7 @@ public class CassandraRunner implements Runner {
                 long througputInc = (totalBytesWritten - lastTotalBytes) * 1000 / (System.currentTimeMillis() - incrementalTime);
                 lastTotalBytes = totalBytesWritten;
                 incrementalTime = System.currentTimeMillis();
-                System.out.printf("Written %,dB [%,d(hex)B/s][%,d(hex)B/s] %s\n", totalBytesWritten, throughputToDate, througputInc, i);
+                System.out.printf("Written %,dB [TP:%,d(hex)B/s][TPall:%,d(hex)B/s] %s\n", totalBytesWritten, throughputToDate, througputInc, i);
             }
         }
         applyBatch(session, statement);
@@ -131,9 +134,19 @@ public class CassandraRunner implements Runner {
     public RunResult readKeyValuePair(Collection<Integer> keys) throws Exception {
         long start = System.currentTimeMillis();
 
+        long valueSize = readInternal(keys);
+
+        long took = System.currentTimeMillis() - start;
+        System.out.println("Read All took " + took + "ms");
+
+        RunResult runResult = new RunResult("Read Cassandra");
+        runResult.populate(valueSize, took, -1, 1, 1);
+        return runResult;
+    }
+
+    private long readInternal(Collection<Integer> keys) {
         long valueSize = 0;
         for (Integer key : keys) {
-
             StringBuffer s = new StringBuffer();
             s.append("SELECT id, data FROM test.data " +
                     "WHERE id in (");
@@ -148,13 +161,56 @@ public class CassandraRunner implements Runner {
                 valueSize = entry.length;
             }
         }
+        return valueSize;
+    }
 
-        long took = System.currentTimeMillis() - start;
-        System.out.println("Read All took " + took + "ms");
+    @Override
+    public void load(Map<String, String> batch) {
+        Collection keys = batch.keySet();
 
-        RunResult runResult = new RunResult("Read Cassandra");
-        runResult.populate(valueSize, took, -1, 1, 1);
-        return runResult;
+        StringBuilder statement = new StringBuilder();
+        statement.append("BEGIN BATCH\n");
+
+        for (Object key : keys) {
+            //TODO remove some other index
+               statement.append("INSERT INTO test.data (id, secondary) " +
+                        "VALUES (" + key + ",'" +
+                        batch.get(key) +
+                        "');");
+        }
+        statement.append("\nAPPLY BATCH\n");
+//        System.out.println(statement);
+        session.execute(statement.toString());
+    }
+
+    @Override
+    public void read(Collection keys, RowValidator rowValidator) {
+
+        StringBuffer s = new StringBuffer();
+        s.append("SELECT id, secondary FROM test.data " +
+                "WHERE id in (");
+        for (Object key : keys) {
+            s.append(key);
+            s.append(",");
+        }
+        s.setCharAt(s.length()-1,' ');
+        s.append(");");
+
+
+//        System.out.println(s);
+        ResultSet results = session.execute(s.toString());
+        for (Row row : results) {
+            Map.Entry entry = getEntry(row);
+            rowValidator.validate(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private Map.Entry getEntry(Row row) {
+
+        String key = String.valueOf(row.getInt("id"));
+        String value = row.getString("secondary");
+
+       return new  AbstractMap.SimpleEntry<String, String>(key,value);
     }
 
     @Override
@@ -164,6 +220,7 @@ public class CassandraRunner implements Runner {
 
 
     private StringBuilder applyBatch(Session session, StringBuilder statement) {
+
         statement.append("apply batch\n");
         session.execute(statement.toString());
         statement = new StringBuilder();

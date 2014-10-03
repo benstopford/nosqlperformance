@@ -1,131 +1,100 @@
 package com.benstopford.nosql;
 
-import java.util.*;
+import com.benstopford.nosql.tests.RandomRead;
+import com.benstopford.nosql.tests.SequentialRead;
+import com.benstopford.nosql.tests.SequentialWrite;
+import com.benstopford.nosql.util.Logger;
+import com.benstopford.nosql.util.OutputUtils;
+import com.benstopford.nosql.util.Result;
 
-import static com.benstopford.nosql.util.PerformanceTimer.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+
+import static com.benstopford.nosql.util.OutputUtils.Series;
+import static java.lang.String.format;
+import static java.util.stream.Collectors.toList;
 
 public class Main {
+    private static Logger log = Logger.instance();
 
-    int cumulativeWriteCount = 0;
+    private RunContext runContext;
+
+    public static class RunContext {
+        public Long writesSoFar = 0L;
+    }
+
+    static class RunParams {
+        final int numberOfEntries = 2 * 1024;
+        final int entrySizeBytes = 1024;
+        final long iterations = 4;
+        final long batchSize = 100;
+
+        public long dataSize() {
+            return iterations * numberOfEntries * entrySizeBytes;
+        }
+    }
 
     public static void main(String[] args) throws Exception {
-        new Main();
+        new Main(new RunParams());
     }
 
-    public Main() throws Exception {
-        go();
-    }
-
-    private void go() throws Exception {
-        DB db = (DB) Class.forName("com.benstopford.nosql.cassandra.Cassandra").newInstance();
-        db.initialise();
-
+    public Main(RunParams args) throws Exception {
+        DB db = (DB) Class.forName("com.benstopford.nosql.databases.couchbase.Couchbase").newInstance();
         try {
-            runTests(db);
-        } catch (Exception e) {
+            go(name(db), db, args);
+        } catch (Throwable e) {
             e.printStackTrace();
         } finally {
             db.clearDown();
             System.exit(-1);
         }
-
     }
 
-    private void runTests(DB db) throws Exception {
-        int numberOfEntries = 100 * 1024;
-        int entrySizeBytes = 1024;
-        long iterations = 200;
+    private String name(DB db) {
+        String name = db.getClass().getSimpleName() + System.currentTimeMillis();
+        log.info("Execution name:" + name);
+        return name;
+    }
 
-        System.out.printf("Running up to a max dataset size of %,dB\n", iterations * numberOfEntries * entrySizeBytes);
+    private void go(String name, DB db, RunParams p) throws Exception {
+        log.info(format("Running up to a max dataset size of %,dB\n", p.dataSize()));
+        db.initialise();
+        runContext = new RunContext();
+        List<Result> state = new ArrayList();
 
-        for (int i = 0; i < iterations; i++) {
-            write(db, numberOfEntries, entrySizeBytes, 100);
-            readRandom(db, cumulativeWriteCount, numberOfEntries, entrySizeBytes, 100);
-            readSequential(db, numberOfEntries, entrySizeBytes, 100);
+        for (int i = 0; i < p.iterations; i++) {
+            process(state,
+                    new SequentialWrite(runContext, db, runContext.writesSoFar, runContext.writesSoFar + p.numberOfEntries, p.entrySizeBytes, p.batchSize).execute());
+            process(state,
+                    new SequentialRead(runContext, db, 0, p.numberOfEntries, p.entrySizeBytes, p.batchSize, state).execute());
+            process(state,
+                    new RandomRead(runContext, db, runContext.writesSoFar - 1, p.numberOfEntries, p.entrySizeBytes, p.batchSize, state).execute());
+
+            OutputUtils.save(state, name);
+            printChart(state, db);
         }
+
+        OutputUtils.copyChartToDataOuptutDir(name);
     }
 
-
-    private void write(DB db, int numberOfEntries, int entrySizeBytes, int batchSize) throws Exception {
-
-        String value = new String(new char[1024]);
-
-        Map<String, String> writeBatch = new HashMap<String, String>();
-
-        start();
-        for (int i = 0; i < numberOfEntries; i++) {
-            writeBatch.put(String.valueOf(i), value);
-            if (i % batchSize == 0 || i == numberOfEntries - 1) {
-                db.load(writeBatch);
-                cumulativeWriteCount += writeBatch.size();
-                writeBatch.clear();
-            }
-        }
-        Took took = end();
-
-        log("Write:", numberOfEntries, entrySizeBytes, batchSize, took, -1);
-
+    private void process(List<Result> state, Result execute) {
+        state.add(execute);
+        log.info(execute.toString());
     }
 
+    public void printChart(List<Result> data, DB db) throws Exception {
+        String dbName = db.getClass().getSimpleName();
 
-    private void readSequential(DB db, long readCount, long entrySize, long batchSize) throws Exception {
+        Function<String, List<Long>> throughputFilter = (String type) -> data.stream()
+                .filter(result -> type.equals(result.name))
+                .map(result -> result.throughput)
+                .collect(toList());
 
-        Collection<String> readBatch = new ArrayList<String>();
-        CountingValidator countingValidator = new CountingValidator();
-
-        start();
-        for (int i = 0; i < readCount; i++) {
-            readBatch.add(String.valueOf(i));
-            if (i % batchSize == 0) {
-                db.read(readBatch, countingValidator);
-                readBatch.clear();
-            }
-        }
-        if (readBatch.size() > 0)
-            db.read(readBatch, countingValidator);
-
-        Took took = end();
-
-        assertEqual(countingValidator.count, readCount);
-
-        log("ReadSeq:", readCount, entrySize, batchSize, took, countingValidator.totalBytes());
-
-    }
-
-    private void log(String type, long readCount, long entrySize, long batchSize, Took took, long recordedBytes) {
-        System.out.printf("%s [input:%,dB][output:%,dB][batch:%,d][took:%,dms][Throughput:%,dB/s][totalSize:%,dB]\n", type,
-                readCount * entrySize, recordedBytes, batchSize, took.ms(), (readCount * entrySize * 1000L) / took.ms()
-                , cumulativeWriteCount * entrySize);
-    }
-
-    private void assertEqual(Object a, Object b) {
-        if (!a.equals(b)) throw new RuntimeException(a + " is not " + b);
-    }
-
-
-    private void readRandom(DB db, long incrementalKeySpace, long readCount, long entrySize, long batch) throws Exception {
-
-        List<String> keys = new ArrayList<String>();
-        Random random = new Random();
-        CountingValidator countingValidator = new CountingValidator();
-
-        start();
-        for (int i = 0; i < readCount; i++) {
-            int key = (int) Math.round(random.nextDouble() * incrementalKeySpace);
-            keys.add(String.valueOf(key));
-            if (i % batch == 0) {
-                db.read(keys, countingValidator);
-                keys.clear();
-            }
-        }
-        if (keys.size() > 0)
-            db.read(keys, countingValidator);
-
-        Took took = end();
-
-        //todo renable me
-        // assertEqual(countingValidator.count, readCount);
-
-        log("ReadRand:", readCount, entrySize, batch, took, countingValidator.totalBytes());
+        OutputUtils.seriesChart(
+                Series.of(dbName, "ReadRand", throughputFilter.apply("ReadRand")),
+                Series.of(dbName, "ReadSeq", throughputFilter.apply("ReadSeq")),
+                Series.of(dbName, "Write", throughputFilter.apply("Write"))
+        );
     }
 }

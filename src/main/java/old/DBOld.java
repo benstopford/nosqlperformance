@@ -1,24 +1,28 @@
-package com.benstopford.nosql;
-
+package old;
 
 import com.benstopford.nosql.util.validators.RowValidator;
 
 import java.util.Collection;
 import java.util.Map;
 
-public interface DB {
+public interface DBOld {
     void initialise() throws Exception;
 
     void clearDown() throws Exception;
 
-    void finalise() throws Exception;
+    RunResult loadKeyValuePairs(long numberOfEntries, int entrySizeBytes, int entriesPerBatch) throws Exception;
+
+    RunResult readKeyValuePairs(long numberOfEntries, int entriesPerBatch) throws Exception;
+
+    RunResult readKeyValuePair(Collection<Integer> keys) throws Exception;
+
 
     /**
      * The Database is required to load the supplied set of key value pairs into the database.
      * @param batch - the key-value pairs to load.
      * @return
      */
-    void load(Map<String, String> batch) throws Exception;
+    void load(Map<String, String> batch);
 
 
     /**
@@ -26,6 +30,8 @@ public interface DB {
      * @param keys - the keys to write
      * @param validator - the validator used to validate each key-value pair in the result
      */
-    void read(Collection<String> keys, RowValidator rowValidator) throws Exception;
+    void read(Collection<String> keys, RowValidator rowValidator);
+
+    void finalise() throws Exception;
 
 }

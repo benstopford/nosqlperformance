@@ -1,4 +1,4 @@
-package com.benstopford.nosql;
+package old;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +10,7 @@ public class RunMe {
     }
 
     public RunMe() throws Exception {
-        runUpDownTest();
+//        runUpDownTest();
         randomLargeDatasetReadTest();
     }
 
@@ -35,8 +35,12 @@ public class RunMe {
     private void randomLargeDatasetReadTest() throws Exception {
         List<RunResult> results = new ArrayList<RunResult>();
 
-        writeThenReadSetAtRandom(1024 * 1024 * 1024, 5 * 1024, 1000, "com.benstopford.nosql.cassandra.CassandraRunner", results, 100);
-        writeThenReadSetAtRandom(1024 * 1024 * 1024, 5 * 1024, 1000, "com.benstopford.nosql.coherence.CoherenceRunner", results, 100);
+        int entries = 200 * 1024;
+        int size = 1024;
+        int batch = 100;
+        int numKeysToRead = 100;
+        writeThenReadSetAtRandom(entries, size, batch, "com.benstopford.nosql.cassandra.CassandraRunner", results, numKeysToRead);
+//        writeThenReadSetAtRandom(entries, size, batch, "com.benstopford.nosql.coherence.CoherenceRunner", results, numKeysToRead);
 
         System.out.println("-----------------------");
         for (RunResult r : results) {
@@ -48,7 +52,7 @@ public class RunMe {
         System.out.println("Start---------------" + className + "----------------");
         System.out.printf("Data size: %,dB\n", entrySizeBytes * numberOfEntries);
 
-        Runner run = (Runner) Class.forName(className).newInstance();
+        DBOld run = (DBOld) Class.forName(className).newInstance();
         run.initialise();
         run.clearDown();
 
@@ -68,7 +72,7 @@ public class RunMe {
         System.out.println("Start---------------" + className + "----------------");
         System.out.printf("Data size: %,dB\n", entrySizeBytes * numberOfEntries);
 
-        Runner run = (Runner) Class.forName(className).newInstance();
+        DBOld run = (DBOld) Class.forName(className).newInstance();
         run.initialise();
         run.clearDown();
 
