@@ -10,6 +10,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import static java.util.stream.Collectors.toList;
 
 public class OutputUtils {
     private static Logger log = Logger.instance();
@@ -28,9 +32,6 @@ public class OutputUtils {
     public static final File libOutputDir = new File(dataOutputDirName + "lib");
 
     public static void seriesChart(Series... theSeries) throws Exception {
-        for (Series s : theSeries)
-            log.info(s.toString());
-
         String template = new String(Files.readAllBytes(templateLocation));
 
         StringBuffer data = new StringBuffer();
@@ -57,7 +58,7 @@ public class OutputUtils {
         FileUtils.copyDirectory(libDir, libOutputDir);
     }
 
-    public static void save(List<Result> state, String name) throws IOException {
+    public static void saveToFile(List<Result> state, String name) throws IOException {
         String s = new XStream().toXML(state);
         File toDir = new File(dataOutputDir, name);
         if (!toDir.exists())
@@ -91,6 +92,38 @@ public class OutputUtils {
                     '}';
         }
     }
+
+    public static void printCombinedChart(Map<String, List<Result>> allResults) throws Exception {
+        List<Series> allSeries = new ArrayList<>();
+        for(String name: allResults.keySet()){
+            Function<String, List<Long>> throughputFilter = (String type) -> allResults.get(name).stream()
+                    .filter(result -> type.equals(result.name))
+                    .map(result -> result.throughput)
+                    .collect(toList());
+
+
+            allSeries.add(Series.of(name, name+":ReadRand", throughputFilter.apply("ReadRand")));
+            allSeries.add(Series.of(name, name+":ReadSeq", throughputFilter.apply("ReadSeq")));
+            allSeries.add(Series.of(name, name+":Write", throughputFilter.apply("Write")));
+
+        }
+        OutputUtils.seriesChart(allSeries.toArray(new Series[]{}));
+    }
+
+
+    public static void printChart(List<Result> data, String dbName) throws Exception {
+        Function<String, List<Long>> throughputFilter = (String type) -> data.stream()
+                .filter(result -> type.equals(result.name))
+                .map(result -> result.throughput)
+                .collect(toList());
+
+        OutputUtils.seriesChart(
+                Series.of(dbName, "ReadRand", throughputFilter.apply("ReadRand")),
+                Series.of(dbName, "ReadSeq", throughputFilter.apply("ReadSeq")),
+                Series.of(dbName, "Write", throughputFilter.apply("Write"))
+        );
+    }
+
 
     public static void main(String[] args) throws IOException {
         copyChartToDataOuptutDir("test");

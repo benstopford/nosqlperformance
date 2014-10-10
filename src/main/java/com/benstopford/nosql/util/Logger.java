@@ -11,6 +11,4 @@ public class Logger {
     public void info(String o, Object... args){
         System.out.println(String.format(o, args));
     }
-
-
 }

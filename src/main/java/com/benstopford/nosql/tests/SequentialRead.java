@@ -1,11 +1,11 @@
 package com.benstopford.nosql.tests;
 
-import com.benstopford.nosql.util.validators.CountingValidator;
 import com.benstopford.nosql.DB;
 import com.benstopford.nosql.Main;
 import com.benstopford.nosql.util.Logger;
 import com.benstopford.nosql.util.PerformanceTimer;
 import com.benstopford.nosql.util.Result;
+import com.benstopford.nosql.util.validators.CountingValidator;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,7 +13,6 @@ import java.util.List;
 
 import static com.benstopford.nosql.util.PerformanceTimer.end;
 import static com.benstopford.nosql.util.PerformanceTimer.start;
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.valueOf;
 
 ;
@@ -21,7 +20,7 @@ import static java.lang.String.valueOf;
 public class SequentialRead implements PerformanceTest {
     Logger log = Logger.instance();
 
-    private Main.RunContext runContext;
+    private Main.RunState runState;
     private DB db;
     private long from;
     private long to;
@@ -29,8 +28,8 @@ public class SequentialRead implements PerformanceTest {
     private long batchSize;
     private List<Result> state;
 
-    public SequentialRead(Main.RunContext runContext, DB db, long from, long to, long entrySize, long batchSize, List<Result> state) {
-        this.runContext = runContext;
+    public SequentialRead(Main.RunState runState, DB db, long from, long to, long entrySize, long batchSize, List<Result> state) {
+        this.runState = runState;
         this.db = db;
         this.from = from;
         this.to = to;
@@ -57,12 +56,10 @@ public class SequentialRead implements PerformanceTest {
 
         PerformanceTimer.Took took = end();
 
-        Result result = new Result("ReadSeq", (to - from) * entrySize, countingValidator.valueBytes, batchSize, took.ms(), 1000000000L * countingValidator.totalBytes() / took.ns(), runContext.writesSoFar * entrySize);
+        Result result = new Result("ReadSeq", (to - from) * entrySize, countingValidator.valueBytes(), batchSize, took.ms(), 1000000000L * countingValidator.totalBytes() / took.ns(), runState.writesSoFar * entrySize);
 
-        checkArgument(countingValidator.count == to - from, "Read count did not match", countingValidator, result);
-        checkArgument(countingValidator.valueBytes == result.estimatedBytes, "Read bytes did not match", countingValidator, result);
-
-        log.info(result);
+        countingValidator.assertCountIsValid(to - from);
+        countingValidator.assertTotalValueBytesAreValid(result.estimatedBytes);
 
         return result;
 

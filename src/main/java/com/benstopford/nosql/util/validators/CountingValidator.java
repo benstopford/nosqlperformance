@@ -3,9 +3,9 @@ package com.benstopford.nosql.util.validators;
 import com.google.common.base.Preconditions;
 
 public class CountingValidator implements RowValidator {
-    public long count = 0;
-    public long keyBytes = 0;
-    public long valueBytes = 0;
+    private long count = 0;
+    private long keyBytes = 0;
+    private long valueBytes = 0;
     @Override
     public void validate(Object key, Object value) {
         try {
@@ -23,6 +23,7 @@ public class CountingValidator implements RowValidator {
         }
     }
 
+    @Override
     public long totalBytes(){
         return keyBytes+valueBytes;
     }
@@ -35,5 +36,27 @@ public class CountingValidator implements RowValidator {
                 ", valueBytes=" + valueBytes +
                 ", totalBytes=" + totalBytes() +
                 '}';
+    }
+
+    @Override
+    public void assertCountIsValid(long expected) {
+        Preconditions.checkState(count==expected, "Counts did not match %s != %s", count, expected, this);
+    }
+
+    @Override
+    public void reset() {
+        count = 0;
+        keyBytes = 0;
+        valueBytes = 0;
+    }
+
+    @Override
+    public long valueBytes() {
+        return valueBytes;
+    }
+
+    @Override
+    public void assertTotalValueBytesAreValid(long expected) {
+        Preconditions.checkState(valueBytes==expected, "Bytes did not match %s != %s", count, expected, this);
     }
 }

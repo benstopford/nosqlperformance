@@ -6,6 +6,7 @@ import com.benstopford.nosql.util.Logger;
 import com.benstopford.nosql.util.PerformanceTimer;
 import com.benstopford.nosql.util.Result;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,14 +16,14 @@ import static java.lang.String.valueOf;
 
 public class SequentialWrite implements PerformanceTest {
     private static final Logger log = Logger.instance();
-    private Main.RunContext c;
+    private Main.RunState c;
     private DB db;
     private long from;
     private long to;
     private int entrySize;
     private long batchSize;
 
-    public SequentialWrite(Main.RunContext context, DB db, long from, long to, int entrySize, long batchSize) {
+    public SequentialWrite(Main.RunState context, DB db, long from, long to, int entrySize, long batchSize) {
         this.c = context;
         this.db = db;
         this.from = from;
@@ -33,10 +34,9 @@ public class SequentialWrite implements PerformanceTest {
 
     public Result execute() throws Exception {
         long bytesWritten = 0;
-        String data = new String(new char[entrySize]);
-        Map<String, String> writeBatch = new HashMap();
+        String data = data();
 
-        log.info("Inserting ids %s to %s", from, to);
+        Map<String, String> writeBatch = new HashMap();
 
         long from = this.from;
         long to = this.to;
@@ -61,5 +61,11 @@ public class SequentialWrite implements PerformanceTest {
                 took.ms(),
                 1000000000L * bytesWritten / took.ns(),
                 c.writesSoFar * entrySize);
+    }
+
+    private String data() {
+        char[] a = new char[entrySize];
+        Arrays.fill(a, 'Z');
+        return new String(a);
     }
 }

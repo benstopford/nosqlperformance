@@ -5,15 +5,13 @@ import com.benstopford.nosql.Main;
 import com.benstopford.nosql.util.Logger;
 import com.benstopford.nosql.util.PerformanceTimer;
 import com.benstopford.nosql.util.Result;
-import com.benstopford.nosql.util.validators.CountingValidator;
+import com.benstopford.nosql.util.validators.RowValidator;
+import com.google.common.base.Preconditions;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 import static com.benstopford.nosql.util.PerformanceTimer.end;
 import static com.benstopford.nosql.util.PerformanceTimer.start;
-import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.valueOf;
 
 ;
@@ -21,48 +19,61 @@ import static java.lang.String.valueOf;
 public class RandomRead implements PerformanceTest {
     Logger log = Logger.instance();
 
-    private Main.RunContext runContext;
+    private Main.RunState runState;
     private DB db;
     private long incrementalKeySpace;
     private long readCount;
     private long entrySize;
     private long batch;
-    private List<Result> state;
+    private RowValidator validator;
+    private Random random = new Random();
 
-    public RandomRead(Main.RunContext runContext, DB db, long incrementalKeySpace, long readCount, long entrySize, long batch, List<Result> state) throws Exception {
-        this.runContext = runContext;
+    public RandomRead(Main.RunState runState, DB db, long incrementalKeySpace, long readCount, long entrySize, long batch, RowValidator rowValidator) throws Exception {
+        this.runState = runState;
         this.db = db;
         this.incrementalKeySpace = incrementalKeySpace;
         this.readCount = readCount;
         this.entrySize = entrySize;
         this.batch = batch;
-        this.state = state;
+        this.validator = rowValidator;
     }
 
     @Override
     public Result execute() throws Exception {
-        List<String> keys = new ArrayList();
-        Random random = new Random();
-        CountingValidator validator = new CountingValidator();
+        validator.reset();
 
+        long count = readCount;
+        //appears that random reads read a batch of keys and they may not be unique .. hence less results
         start();
-        for (int i = 0; i < readCount; i++) {
-            int key = (int) Math.round(random.nextDouble() * incrementalKeySpace);
-            keys.add(valueOf(key));
-            if (i % batch == 0) {
-                db.read(keys, validator);
-                keys.clear();
-            }
-        }
-        if (keys.size() > 0)
+        while (count > 0) {
+            Collection<String> keys = getKeys(count);
             db.read(keys, validator);
+            count -= keys.size();
+        }
 
         PerformanceTimer.Took took = end();
 
-        Result result = new Result("ReadRand", readCount * entrySize, validator.valueBytes, batch, took.ms(), 1000000000L * validator.totalBytes() / took.ns(), runContext.writesSoFar * entrySize);
-        checkState(validator.count == readCount, "Counts did not match %s != %s", validator.count, readCount, result);
-
-        log.info(result.toString());
+        Result result = new Result("ReadRand", readCount * entrySize, validator.valueBytes(), batch, took.ms(), 1000000000L * validator.totalBytes() / took.ns(), runState.writesSoFar * entrySize);
+        validator.assertCountIsValid(readCount);
         return result;
+    }
+
+    private Collection<String> getKeys(long count) {
+        Collection<String> theKeys;
+        if (count > batch)
+            theKeys = nRandomKeys(batch);
+        else
+            theKeys = nRandomKeys(count);
+        return theKeys;
+    }
+
+    private Collection<String> nRandomKeys(long batch) {
+        Set<String> keys = new HashSet();
+        while (keys.size() < batch) {
+            String key = valueOf(Math.round(random.nextDouble() * incrementalKeySpace));
+            keys.add(key);
+        }
+        Preconditions.checkState(keys.size() == batch);
+        return keys;
     }
 }
